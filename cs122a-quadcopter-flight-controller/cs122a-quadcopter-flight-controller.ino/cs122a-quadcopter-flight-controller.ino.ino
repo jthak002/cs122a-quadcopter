@@ -1,64 +1,50 @@
 #include <SoftwareSerial.h>
 #include <Servo.h>
-
-//********REMOTE CONTORL TRANSMISSION CODES
-#define THROTTLE_UP_1 0x11
-#define THROTTLE_UP_2 0x13
-#define THROTTLE_DWN_1 0x14
-#define THROTTLE_DWN_2 0x1C
-#define THROTTLE_NEUTRAL 0x10
-
-#define YAW_LEFT_1 0x34
-#define YAW_LEFT_2 0x3C
-#define YAW_RIGHT_1 0x31
-#define YAW_RIGHT_2 0x33
-#define YAW_NEUTRAL 0x30
-
-#define PITCH_FWD_1 0x41
-#define PITCH_FWD_2 0x43
-#define PITCH_BCK_1 0x44
-#define PITCH_BCK_2 0x4C
-#define PITCH_NEUTRAL 0x40
-
-#define ROLL_LEFT_1 0xC1
-#define ROLL_LEFT_2 0xC2
-#define ROLL_RIGHT_1 0xC4
-#define ROLL_RIGHT_2 0xCC
-#define ROLL_NEUTRAL 0xC0
-
-#define ERROR_HALT 0xFF
-
-//********MOTOR_PIN DEFINITIONS********
-//1 is front CCW
-//2 is back CW
-//3 is back CCW
-//4 is front CW
-#define FRONT_RIGHT_CCW 5
-#define BACK_RIGHT_CW 6
-#define BACK_LEFT_CCW 9
-#define FRONT_LEFT_CW 10
-
-//*********BLUETOOTH PIN DEFINITION*****
-#define BT_RCV 11
-#define BT_TX 12
-
-//********IMU I2C CONNECTION PINS*******
+#include "config.h"
 
 //*********GLOBAL VARIABLES**************
 SoftwareSerial BTSerial(11,12); //Bluetooth connection variable
-//*******FORWARD DECLARATIONS***********
+Servo motor_fccw;
+Servo motor_bcw;
+Servo motor_bccw;
+Servo motor_fcw;
+
+int throttle=0;
+int throttlePin=0;
+int pos=0;
+//*******FUNCTION DECLARATIONS***********
 void BT_Recv_Controller_Data();
+
+
+//*******MAIN ARDUINO PROGRAM******
 void setup() {
  // put your setup code here, to run once: 
-  Serial.begin(9600); //for testing purposes only
-  BTSerial.begin(38400);  //initializing the bluetooth connection
-                          //at 38400 BAUD rate. already paired to controller
-  
+  Serial.begin(9600);
+  BTSerial.begin(38400);
+  motor_fccw.attach(5);
+  pinMode(13,OUTPUT);
+  motor_bcw.attach(6);
+  motor_bccw.attach(9);
+  motor_bcw.attach(10);
+  for(int i=0;i<20;i++)
+  {
+    if(i>30)
+      setSpeed(20);
+    else
+      setSpeed(i);
+    delay(1000);
+  }
 }
 
+void setSpeed(int speed){
+  int angle=map(speed,0,100,0,180);
+  motor_fccw.write(angle);
+  motor_bcw.write(angle);
+}
 void loop() {
   // put your main code here, to run repeatedly:
-  BT_Recv_Controller_Data();
+  if(pos==0)
+    BT_Recv_Controller_Data(); 
 }
 
 void BT_Recv_Controller_Data(){
@@ -69,24 +55,31 @@ void BT_Recv_Controller_Data(){
     switch(controller_value){
       case THROTTLE_UP_1:
         Serial.println("THROTTLE_UP_1");
+        setSpeed(33);
         break;
         case THROTTLE_UP_2:
         Serial.println("THROTTLE_UP_2");
+        setSpeed(35);
         break;
         case THROTTLE_DWN_1:
         Serial.println("THROTTLE_DWN_1");
+        setSpeed(28);
         break;
         case THROTTLE_DWN_2:
         Serial.println("THROTTLE_DWN_2");
+        setSpeed(25);
         break;
         case THROTTLE_NEUTRAL:
         Serial.println("THROTTLE_NEUTRAL");
+        setSpeed(30);
         break;
         case PITCH_FWD_1:
         Serial.println("PITCH_FWD_1");
         break;
         case PITCH_FWD_2:
         Serial.println("PITCH_FWD_2");
+        setSpeed(0);
+        pos=1;
         break;
         case PITCH_NEUTRAL:
         Serial.println("PITCH_NEUTRAL");
@@ -134,4 +127,3 @@ void BT_Recv_Controller_Data(){
     }
   } 
 }
-

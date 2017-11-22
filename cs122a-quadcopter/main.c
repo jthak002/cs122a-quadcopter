@@ -412,7 +412,7 @@ int main(void)
     LCD_DisplayString(1,"CONNECTING....");
     while(1)
     {
-        if(counter%30==0){
+        if(counter%21==0){
             SM2_Tick();
             counter++;
         }
@@ -423,9 +423,9 @@ int main(void)
         }
         else{
             SM1_Tick();
+            SM4_Tick();
             counter++;
         }
-        SM4_Tick();
         while(!TimerFlag);
         TimerFlag = 0;
     }
