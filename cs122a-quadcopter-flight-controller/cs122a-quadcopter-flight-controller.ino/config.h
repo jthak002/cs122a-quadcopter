@@ -42,9 +42,10 @@
 #define BT_RCV 11
 #define BT_TX 12
 
-//********IMU I2C CONNECTION PINS*******
+//********IMU CONFIGURATION*******
+#define YAW 0
+#define PITCH 2
+#define ROLL 1
 
-//*******MOTOR VARIABLES****************
-#define MOTOR_MAX 153
-#define MOTOR_MIN 55
-#define MOTOR_ARM 65
+//CONFIG DECLARATIONS
+#define TEST_IMU
