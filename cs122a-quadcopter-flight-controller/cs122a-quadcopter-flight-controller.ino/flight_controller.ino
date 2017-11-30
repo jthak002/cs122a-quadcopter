@@ -3,8 +3,8 @@
 #define PITCH_KD 0
 
 #define ROLL_KP 1
-#define ROLL_KI 1
-#define ROLL_KD 1
+#define ROLL_KI 0
+#define ROLL_KD 0
 void throttle_pid_controller()
 {
   //Variables to store the initial values of the motors speeds
@@ -166,35 +166,24 @@ void throttle_pid_controller()
   if(err<0) //ROLL RIGHT
   {
     actuator_speed=ROLL_KP*err;
-    if(imotor_bccw_speed==THROTTLE_MAX && imotor_fcw_speed==THROTTLE_MAX)           //PREVENT LEFT MOTORS FROM BEING STUCK AT MAX
+    if(imotor_fccw_speed+imotor_bcw_speed < imotor_fcw_speed+imotor_bccw_speed)  //THE SPEED OF THE RIGHT MOTORS < SPEED OF THE LEFT MOTORS, REDUCE LEFT SPEED
     {
-      if(imotor_bccw_speed+actuator_speed<THROTTLE_MIN)
-        motor_bccw_speed=getAvg(motor_bccw_speed,THROTTLE_MIN);
-      else
-        motor_bccw_speed=getAvg(motor_bccw_speed,imotor_bccw_speed+actuator_speed);
-      if(imotor_fcw_speed+actuator_speed<THROTTLE_MIN)
+      if(imotor_fcw_speed + actuator_speed<=THROTTLE_MIN)
         motor_fcw_speed=getAvg(motor_fcw_speed,THROTTLE_MIN);
       else
         motor_fcw_speed=getAvg(motor_fcw_speed,imotor_fcw_speed+actuator_speed);
-    }
-    else if(imotor_fccw_speed+imotor_bcw_speed < imotor_fcw_speed+imotor_bccw_speed)  //THE SPEED OF THE RIGHT MOTORS < SPEED OF THE LEFT MOTORS, REDUCE LEFT SPEED
-    {
-      if(imotor_fcw_speed + actuator_speed<THROTTLE_MIN)
-        motor_fcw_speed=getAvg(motor_fcw_speed,THROTTLE_MIN);
-      else
-        motor_fcw_speed=getAvg(motor_fcw_speed,imotor_fcw_speed+actuator_speed);
-      if(imotor_bccw_speed + actuator_speed < THROTTLE_MIN)
+      if(imotor_bccw_speed + actuator_speed <= THROTTLE_MIN)
         motor_bccw_speed=getAvg(motor_bccw_speed,THROTTLE_MIN);
       else
         motor_bccw_speed=getAvg(imotor_bccw_speed+actuator_speed,motor_bccw_speed);
     }
     else          //INCREASING THE SPEED OF THE RIGHT MOTORS
     {
-      if(imotor_fccw_speed-actuator_speed>THROTTLE_MAX)
+      if(imotor_fccw_speed-actuator_speed>=THROTTLE_MAX)
         motor_fccw_speed=getAvg(motor_fccw_speed,THROTTLE_MAX);
       else
         motor_fccw_speed=getAvg(motor_fccw_speed, imotor_fccw_speed-actuator_speed);
-      if(imotor_bcw_speed-actuator_speed>THROTTLE_MAX)
+      if(imotor_bcw_speed-actuator_speed>=THROTTLE_MAX)
         motor_bcw_speed=getAvg(motor_bcw_speed,THROTTLE_MAX);
       else
         motor_bcw_speed=getAvg(motor_bcw_speed, imotor_bcw_speed-actuator_speed);
@@ -202,6 +191,7 @@ void throttle_pid_controller()
   }
   else if(err>0) //ROLL LEFT
   {
+    actuator_speed=ROLL_KP*err;
     if(imotor_fcw_speed + imotor_bccw_speed <imotor_fccw_speed+imotor_bcw_speed)  //RIGHT MOTORS SPEED GREATER THAN LEFT MOTORS SPEED
                                                                                   //REDUCE RIGHT MOTORS SPEED
     {
@@ -214,8 +204,7 @@ void throttle_pid_controller()
       else
         motor_bcw_speed=getAvg(motor_bcw_speed,imotor_bcw_speed-actuator_speed);
     }
-    else                                                                          //LEFT MOTORS SPEED LESS THAN RIGHT MOTORS SPEED
-                                                                                  //INCREASE LEFT MOTORS SPEED
+    else                                                                          //LEFT MOTORS SPEED LESS THAN RIGHT MOTORS SPEED                                                                                //INCREASE LEFT MOTORS SPEED
     {
       if(imotor_fcw_speed+actuator_speed>THROTTLE_MAX)
         motor_fcw_speed=getAvg(motor_fcw_speed,THROTTLE_MAX);
