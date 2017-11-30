@@ -32,8 +32,7 @@
 
 //******STATUS_CODE_GLOBAL_VARIABLES
 unsigned char RUN_CODE=0x00;
-unsigned char DISABLE_QUAD=0x00;
-
+unsigned char ERROR_HALT_FLAG=0x00;
 
 
 /*************TIMER FUNCTIONS**************/
@@ -133,7 +132,7 @@ void SM1_Tick(){
 //UPDATES THE VALUES ONTO THE LCD SCREEN
 //EITHER SHOWS 'CONNECTING...' OR THE VLAUES OF 
 //THROTTLE,PITCH,YAW AND ROLL
-enum SM2_States{Start2,led_prep,led_display}SM2_State;
+enum SM2_States{Start2,led_prep,led_display,led_halt_error}SM2_State;
 void SM2_Tick(){
     switch(SM2_State){
         case Start2:
@@ -141,15 +140,21 @@ void SM2_Tick(){
                 SM2_State=led_prep;
             else
                 SM2_State=Start2;
+            if(ERROR_HALT_FLAG)
+                SM2_State=led_halt_error;
             break;
         case led_prep:
             SM2_State=led_display;
+            if(ERROR_HALT_FLAG)
+                SM2_State=led_halt_error;
             break;
         case led_display:
             if(RUN_CODE)
                 SM2_State=led_display;
             else
                 SM2_State=Start2;
+            if(ERROR_HALT_FLAG)
+                SM2_State=led_halt_error;
             break;
         default:break;
     }
@@ -209,13 +214,15 @@ void SM2_Tick(){
         LCD_WriteData(48+abs(adc_inputs[0]));   
         LCD_Cursor(32);          
         break;
-        
+        case led_halt_error:
+            LCD_DisplayString(1,"ERROR_HALT!");
+            break;
         default:break;
     }
 }
 //TRANSMITS THE DATA FROM THE JOYSTIUCKS TO THE FLIGHT CONTROLLER. 
 //EVERY OTHER CLOCK_PERIOD THE DATA FOR PITCH-ROLL OR THROTTLE-YAW IS TRANSMITTED
-enum SM3_States{Start3, controller_send}SM3_State;
+enum SM3_States{Start3, controller_send, halt_send}SM3_State;
 unsigned char send_val=0x00;
 void SM3_Tick(){
     switch(SM3_State)
@@ -225,127 +232,124 @@ void SM3_Tick(){
                 SM3_State=controller_send;
             else
                 SM3_State=Start3;
+            if(ERROR_HALT_FLAG)
+                SM3_State=halt_send;
             break;
         case controller_send:
             if(RUN_CODE)
-            SM3_State=controller_send;
+                SM3_State=controller_send;
             else
-            SM3_State=Start3;
+                SM3_State=Start3;
+            if(ERROR_HALT_FLAG)
+                SM3_State=halt_send;
             break;
         default:break;
     }
     switch(SM3_State){
         case controller_send:
-            //CHECK IF USER HAS INITIATED DISABLE_QUAD_VARIABLE TO 
-            //GROUND THE QUADCOPTER VIA GRADUAL DESCENT 
-            if(DISABLE_QUAD==0x00)
+            if(send_val)
             {
-                if(send_val)
+                //TRANSMIT ROLL CONTROLLER INPUT TO QUAD
+                if(USART_IsSendReady(1))
                 {
-                    //TRANSMIT ROLL CONTROLLER INPUT TO QUAD
-                    if(USART_IsSendReady(1))
+                    //ADC_INPUTS[0] HAVE ROLL VALUES STORED IN THEM
+                    switch(adc_inputs[0])
                     {
-                        //ADC_INPUTS[0] HAVE ROLL VALUES STORED IN THEM
-                        switch(adc_inputs[0])
-                        {
-                            case -2:
-                                USART_Send(ROLL_LEFT_2,1);
-                                break;
-                            case -1:
-                                USART_Send(ROLL_LEFT_1,1);
-                                break;
-                            case 0:
-                                USART_Send(ROLL_NEUTRAL,1);
-                                break;
-                            case 1:
-                                USART_Send(ROLL_RIGHT_1,1);
-                                break;
-                            case 2:
-                                USART_Send(ROLL_RIGHT_2,1);
-                                break;
-                            default:break;
-                        }
-                        while(!USART_HasTransmitted(1));
+                        case -2:
+                            USART_Send(ROLL_LEFT_2,1);
+                            break;
+                        case -1:
+                            USART_Send(ROLL_LEFT_1,1);
+                            break;
+                        case 0:
+                            USART_Send(ROLL_NEUTRAL,1);
+                            break;
+                        case 1:
+                            USART_Send(ROLL_RIGHT_1,1);
+                            break;
+                        case 2:
+                            USART_Send(ROLL_RIGHT_2,1);
+                            break;
+                        default:break;
                     }
-                    //TRANSMIT ROLL CONTROLLER INPUT TO QUAD
-                    if(USART_IsSendReady(1))
-                    {
-                        switch(adc_inputs[1]){
-                            case -2:
-                                USART_Send(PITCH_BCK_2,1);
-                                break;
-                            case -1:
-                                USART_Send(PITCH_BCK_1,1);
-                                break;
-                            case 0:
-                                USART_Send(PITCH_NEUTRAL,1);
-                                break;
-                            case 1:
-                                USART_Send(PITCH_FWD_1,1);
-                                break;
-                            case 2:
-                                USART_Send(PITCH_FWD_2,1);
-                                break;
-                        }
-                        while(!USART_HasTransmitted(1));
-                    }
-                } 
-                else{                    
-                    //TRANSMIT YAW CONTROLLER INPUT TO QUAD
-                    if(USART_IsSendReady(1))
-                    {
-                        switch(adc_inputs[2]){
-                            case -2:
-                            USART_Send(YAW_LEFT_2,1);
-                            break;
-                            case -1:
-                            USART_Send(YAW_LEFT_1,1);
-                            break;
-                            case 0:
-                            USART_Send(YAW_NEUTRAL,1);
-                            break;
-                            case 1:
-                            USART_Send(YAW_RIGHT_1,1);
-                            break;
-                            case 2:
-                            USART_Send(YAW_RIGHT_2,1);
-                            break;
-                        }
-                        while(!USART_HasTransmitted(1));
-                    }
-                    //TRANSMIT THROTTLE CONTROLLER INPUT TO QUAD
-                    if(USART_IsSendReady(1))
-                    {
-                        switch(adc_inputs[3]){
-                            case -2:
-                            USART_Send(THROTTLE_DWN_2,1);
-                            break;
-                            case -1:
-                            USART_Send(THROTTLE_DWN_1,1);
-                            break;
-                            case 0:
-                            USART_Send(THROTTLE_NEUTRAL,1);
-                            break;
-                            case 1:
-                            USART_Send(THROTTLE_UP_1,1);
-                            break;
-                            case 2:
-                            USART_Send(THROTTLE_UP_2,1);
-                            break;
-                        }
-                        while(!USART_HasTransmitted(1));
-                    }
+                    while(!USART_HasTransmitted(1));
                 }
-                send_val=~send_val;                        
+                //TRANSMIT ROLL CONTROLLER INPUT TO QUAD
+                if(USART_IsSendReady(1))
+                {
+                    switch(adc_inputs[1]){
+                        case -2:
+                            USART_Send(PITCH_BCK_2,1);
+                            break;
+                        case -1:
+                            USART_Send(PITCH_BCK_1,1);
+                            break;
+                        case 0:
+                            USART_Send(PITCH_NEUTRAL,1);
+                            break;
+                        case 1:
+                            USART_Send(PITCH_FWD_1,1);
+                            break;
+                        case 2:
+                            USART_Send(PITCH_FWD_2,1);
+                            break;
+                    }
+                    while(!USART_HasTransmitted(1));
+                }
+            } 
+            else{                    
+                //TRANSMIT YAW CONTROLLER INPUT TO QUAD
+                if(USART_IsSendReady(1))
+                {
+                    switch(adc_inputs[2]){
+                        case -2:
+                        USART_Send(YAW_LEFT_2,1);
+                        break;
+                        case -1:
+                        USART_Send(YAW_LEFT_1,1);
+                        break;
+                        case 0:
+                        USART_Send(YAW_NEUTRAL,1);
+                        break;
+                        case 1:
+                        USART_Send(YAW_RIGHT_1,1);
+                        break;
+                        case 2:
+                        USART_Send(YAW_RIGHT_2,1);
+                        break;
+                    }
+                    while(!USART_HasTransmitted(1));
+                }
+                //TRANSMIT THROTTLE CONTROLLER INPUT TO QUAD
+                if(USART_IsSendReady(1))
+                {
+                    switch(adc_inputs[3]){
+                        case -2:
+                        USART_Send(THROTTLE_DWN_2,1);
+                        break;
+                        case -1:
+                        USART_Send(THROTTLE_DWN_1,1);
+                        break;
+                        case 0:
+                        USART_Send(THROTTLE_NEUTRAL,1);
+                        break;
+                        case 1:
+                        USART_Send(THROTTLE_UP_1,1);
+                        break;
+                        case 2:
+                        USART_Send(THROTTLE_UP_2,1);
+                        break;
+                    }
+                    while(!USART_HasTransmitted(1));
+                }
             }
-            //TRANSMIT GROUNDING CODE
-            else
-            {
+            send_val=~send_val;
+            break;
+            case halt_send:
                 if(USART_IsSendReady(1))
                 USART_Send(ERROR_HALT,1);
                 while(!USART_HasTransmitted(1));
-            }
-            break; 
+                break;
             default:break;
     }    
 }
@@ -372,6 +376,32 @@ void SM4_Tick(){
             break; 
                
         default:break;
+    }
+}
+//THIS STATE MACHINE IS RESPONSIBLE FOR CHECKIN GIF THE ERROR_HALT_FLAG IS SET TO 1
+//BY THE BUTTON ATTACHED TO C1. IF ENABLED, SEND COMMAND TO SHUT DOWN THE QUADCOPTER
+
+enum SM5_States{Start5,CHECK_ERROR_HALT}SM5_State;
+void SM5_Tick()
+{
+    switch(SM5_State)
+    {
+        case Start5:
+            SM5_State=CHECK_ERROR_HALT;
+            break;
+        case CHECK_ERROR_HALT:
+            SM5_State=CHECK_ERROR_HALT;
+            break;
+        default:break;
+    }
+    unsigned char input=~PINC&0x02;
+    switch(SM5_State)
+    {
+        case CHECK_ERROR_HALT:
+            if(input)
+                ERROR_HALT_FLAG=0xFF;
+            break;
+        default: break;
     }
 }
 //LISTS ALL THE STATE MACHINES FOR NORMAL FUNCTIONING OF THE 
@@ -402,6 +432,7 @@ int main(void)
     SM2_State=Start2;
     SM3_State=Start3;
     SM4_State=Start4;
+    SM5_State=Start5;
     TimerSet(10);
     TimerOn();
     LCD_init();
@@ -424,6 +455,7 @@ int main(void)
         else{
             SM1_Tick();
             SM4_Tick();
+            SM5_Tick();
             counter++;
         }
         while(!TimerFlag);

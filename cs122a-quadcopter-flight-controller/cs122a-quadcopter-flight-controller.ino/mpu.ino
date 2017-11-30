@@ -28,7 +28,7 @@ uint16_t fifoCount;
 uint8_t fifoBuffer[64];
 //orientation/motion variables
 Quaternion q;
-float ypr[3];
+//float ypr[3];
 VectorFloat gravity;
 #ifdef GET_WORLD_ACCELERATION_VECTOR
 VectorInt16 aa;
@@ -119,6 +119,7 @@ void mpu_acquisition(){
       mpu.dmpGetQuaternion(&q,fifoBuffer);
       mpu.dmpGetGravity(&gravity, &q);
       mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+      mpu.resetFIFO();
       #ifdef GET_WORLD_ACCELERATION_VECTOR
         mpu.dmpGetAccel(&aa,fifoBuffer);
         mpu.dmpGetGravity(&gravity,&q);

@@ -27,7 +27,7 @@
 #define ROLL_NEUTRAL 0xC0
 
 #define ERROR_HALT 0xFF
-
+#define CONNECTION_STATE 8
 //********MOTOR_PIN DEFINITIONS********
 //1 is front CCW
 //2 is back CW
@@ -43,9 +43,20 @@
 #define BT_TX 12
 
 //********IMU CONFIGURATION*******
+//DUE TO THE WRONG PLACEMENT OF THE IMU ON MY QUAD COPTER  
 #define YAW 0
 #define PITCH 2
 #define ROLL 1
-
+//********THROTTLE SPEEDS*******
+#define THROTTLE_MAX 70
+#define THROTTLE_MIN 38
+#define THROTTLE_SPEED__1 44
+#define THROTTLE_SPEED__2 43
+#define THROTTLE_HOVER 46
+#define THROTTLE_SPEED_1 49
+#define THROTTLE_SPEED_2 52
 //CONFIG DECLARATIONS
-#define TEST_IMU
+//UN-COMMENT THE TESTS THAT YOU WANT TO RUN
+//#define TEST_IMU
+//#define TEST_CONTROLLER
+#define TEST_PID

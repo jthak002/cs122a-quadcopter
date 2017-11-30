@@ -1,21 +1,46 @@
 #include <SoftwareSerial.h>
 #include <Servo.h>
 #include "config.h"
+/*******ROTOR TERMINOLOGY*********
+//(1)fccw- FRONT COUNTER CLOCKWISE (DIGITAL PIN 5)
+//(4)fcw- FRONT CLOCKWISE (DIGITAL PIN 6)
+//(3)bcw- BACK CLOCKWISE (DIGITAL PIN 9)
+//(2)bccw- BACK COUNTER CLOCKWISE (DIGITAL PIN 10)
+ (4)      (1)
+   \      /
+    \    /
+     QUAD
+     /   \
+    /     \
+  (3)     (2)
+*/
 //*********GLOBAL VARIABLES**************
 SoftwareSerial BTSerial(11,12); //Bluetooth connection variable
-Servo motor_fccw;
+Servo motor_fccw;       
 Servo motor_bcw;
 Servo motor_bccw;
 Servo motor_fcw;
+int motor_fccw_speed=0;  //FRONT CCW MOTOR(1) SPEED
+int motor_bcw_speed=0;   //BACK CLOCKWISE MOTOR(2) SPEED
+int motor_bccw_speed=0;  //BACK COUNTER CLOCKWISE MOTOR(3) SPEED
+int motor_fcw_speed=0;   //FRONT CLOCKWISE MOTOR(4) SPEED
+int motor_curr_speed=0;  //THROTTLE LEVEL(_1,_2,_HOVER,__1,__2)
 
-int throttle=0;
-int pos=0;
+float ypr[3]; //current yaw/pitch/role obtained out of the MPU
+float i_ypr[3]; //initial yaw/pitch/roll on a flat surface--CALIBRATION
+
+bool arm=false; //Mtotr arming not checked until 
 //*******FUNCTION DECLARATIONS***********
-void BT_Recv_Controller_Data();
 void mpu_Calibrate();
-void mpu_acquisition();
 void motor_Calibrate();
-
+void mpu_acquisition();
+int BT_Recv_Controller_Data();
+//PID Functions
+void throttle_pid_controller();
+/*
+void yaw_pid_controller();
+void pitch_pid_controller();
+void roll_pid_controller();*/
 //*******MAIN ARDUINO PROGRAM******
 void setup() {
  // put your setup code here, to run once: 
@@ -28,130 +53,36 @@ void setup() {
   motor_Calibrate();
   pinMode(13,OUTPUT);
   delay(5000);
+  mpu_acquisition();
+  i_ypr[YAW]=ypr[YAW];
+  i_ypr[PITCH]=ypr[PITCH];
+  i_ypr[ROLL]=ypr[ROLL];
   Serial.println(F("CALIBRATION COMPLETE."));
-}
-
-void setSpeed(int speed){
-  int angle=map(speed,0,100,0,180);
-  motor_fccw.write(angle);
-  motor_bcw.write(angle);
-  motor_bccw.write(angle);
-  motor_fcw.write(angle);
 }
 
 void loop() {
   digitalWrite(13,HIGH);
   mpu_acquisition();
-}
-
-void BT_Recv_Controller_Data(){
-  unsigned char controller_value=0;
-  if(BTSerial.available())
+  int bt_value=BT_Recv_Controller_Data();
+  if(bt_value!=-1 && bt_value!=ERROR_HALT && motor_curr_speed!=0)//ERROR CODES FOR LOSS OF CONNECTIVITY AND EMERGENCY SHUTDOWN 
   {
-    controller_value=BTSerial.read();
-    switch(controller_value){
-      case THROTTLE_UP_1:
-        Serial.println("THROTTLE_UP_1");
-        setSpeed(33);
+    //CONTROLLER SHORT CODES: THE LAST 4 BITS DENOTE THE
+    //CONTROL BEING USED: 0x1 is THROTTLE, 0x3 is YAW
+    //                    0x4 is PITCH, 0xC is ROLL 
+    switch((bt_value&0xF0)>>4)
+    {
+      case 0x1://THROTTLE
+        throttle_pid_controller();
         break;
-        case THROTTLE_UP_2:
-        Serial.println("THROTTLE_UP_2");
-        setSpeed(35);
+      case 0x3://YAW
+        //yaw_pid_controller();
         break;
-        case THROTTLE_DWN_1:
-        Serial.println("THROTTLE_DWN_1");
-        setSpeed(28);
+      case 0x4://ROLL
+        //pitch_pid_controller();
         break;
-        case THROTTLE_DWN_2:
-        Serial.println("THROTTLE_DWN_2");
-        setSpeed(25);
+      case 0xC:
+        //roll_pid_controller();
         break;
-        case THROTTLE_NEUTRAL:
-        Serial.println("THROTTLE_NEUTRAL");
-        setSpeed(30);
-        break;
-        case PITCH_FWD_1:
-        Serial.println("PITCH_FWD_1");
-        break;
-        case PITCH_FWD_2:
-        Serial.println("PITCH_FWD_2");
-        setSpeed(0);
-        pos=1;
-        break;
-        case PITCH_NEUTRAL:
-        Serial.println("PITCH_NEUTRAL");
-        break;
-        case PITCH_BCK_1:
-        Serial.println("PITCH_BCK_1");
-        break;
-        case PITCH_BCK_2:
-        Serial.println("PITCH_BCK_2");
-        break;
-        case ROLL_LEFT_2:
-        Serial.println("ROLL_LEFT_2");
-        break;
-        case ROLL_LEFT_1:
-        Serial.println("ROLL_LEFT_1");
-        break;
-        case ROLL_NEUTRAL:
-        Serial.println("ROLL_NEUTRAL");
-        break;
-        case ROLL_RIGHT_1:
-        Serial.println("ROLL_RIGHT_1");
-        break;
-        case ROLL_RIGHT_2:
-        Serial.println("ROLL_RIGHT_2");
-        break;
-        case YAW_LEFT_2:
-        Serial.println("YAW_LEFT_2");
-        break;
-        case YAW_LEFT_1:
-        Serial.println("YAW_LEFT_1");
-        break;
-        case YAW_NEUTRAL:
-        Serial.println("YAW_NEUTRAL");
-        break;
-        case YAW_RIGHT_1:
-        Serial.println("YAW_RIGHT_1");
-        break;
-        case YAW_RIGHT_2:
-        Serial.println("YAW_RIGHT_2");
-        break;
-        case ERROR_HALT:
-        Serial.println("ERROR_HALT");
-        break;
-        default: break;
     }
-  } 
+  }
 }
-void motor_Calibrate()
-{
-  motor_fccw.attach(FRONT_RIGHT_CCW,600,2250); 
-  motor_bcw.attach(BACK_RIGHT_CW,600,2250);
-  motor_bccw.attach(BACK_LEFT_CCW,600,2250);
-  motor_fcw.attach(FRONT_LEFT_CW,600,2250);
-  //attach the ESC to pin 5, 6, 9 and 10
-  //Due to problems with the ESC recognising the maximum
-  //position at the default settings, the figures after
-  //the pin number are the microsecond signals for the 
-  //minimum and maximum that the ESC will recognise.
-  // 600 and 2250 work.
-  throttle = 180;  //Set the throttle to maximum
-  motor_fccw.write(throttle); 
-  motor_bcw.write(throttle);
-  motor_bccw.write(throttle);
-  motor_fcw.write(throttle);
-  //Set the ESC signal to maximum
-  //At this point the ESC's power should be connected.
-  delay(10000);  //Allow the user time to connect the battery to
-  //the ESC.  
-  throttle = 0;  //Set the throttle to zero
-  motor_fccw.write(throttle);
-  motor_bcw.write(throttle);
-  motor_bccw.write(throttle);
-  motor_fcw.write(throttle);  
-  //Set the ESC signal to the zero position.
-  delay(10000);  // allow a 10 second delay for the ESC to signal
-  //that it is done. 
-}
-
