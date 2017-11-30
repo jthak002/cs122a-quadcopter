@@ -23,7 +23,7 @@ void throttle_pid_controller()
   //OR LESS Power to the FRONT ROTORS
   //ERROR is less than 0. multiply by -1 to add to actuator speed
   float actuator_speed=0;
-  if(err>0) 
+  /*if(err>0) 
   {
     actuator_speed= PITCH_KP*(err);
     if(motor_fccw_speed==THROTTLE_MAX && motor_fcw_speed==THROTTLE_MAX) //PREVENT FRONT MOTOR DEADLOCKS AT THROTTLE_MAX
@@ -156,6 +156,71 @@ void throttle_pid_controller()
   }
   //Normal no pitch abnormality
   if(err==0)
+  {
+    pitch_pid_f=false;
+    pitch_pid_b=false;
+  }*/
+  //PITCH BACKWARD CONDITION
+  if(err>0)
+  {
+    actuator_speed= PITCH_KP*(err);
+    if(motor_bccw_speed+motor_bcw_speed < motor_fccw_speed+motor_fcw_speed) //REDUCE POWER IN FRONT MOTORS
+    {
+      if(motor_fccw_speed-actuator_speed<=THROTTLE_MIN)
+        motor_fccw_speed=THROTTLE_MIN;
+      else
+        motor_fccw_speed-=actuator_speed;
+      if(motor_fcw_speed-actuator_speed<=THROTTLE_MIN)
+        motor_fcw_speed=THROTTLE_MIN;
+      else
+        motor_fcw_speed-=actuator_speed;
+      pitch_pid_f=true;
+    }
+    else    //INCREASE THE POWER IN THE BACK MOTORS
+    {
+      if(motor_bcw_speed+actuator_speed>=THROTTLE_MAX)
+        motor_bcw_speed=THROTTLE_MAX;
+      else
+        motor_bcw_speed+=actuator_speed;
+      if(motor_bccw_speed+actuator_speed>=THROTTLE_MAX)
+        motor_bccw_speed=THROTTLE_MAX;
+      else
+        motor_bccw_speed+=actuator_speed;
+      pitch_pid_b=true;
+    }
+  }
+  //PITCH FORWARD CONDITION
+  //MORE power to front motors
+  else if(err<0)
+  {
+    actuator_speed= PITCH_KP*(err);
+    if(motor_fcw_speed + motor_fccw_speed < motor_bcw_speed+motor_bccw_speed) //REDUCE POWER IN BACK MOTORS
+    {
+      //since actuator speed is negative, you add the speed to reduce the power
+      if(motor_bcw_speed+actuator_speed< THROTTLE_MIN)
+        motor_bcw_speed=THROTTLE_MIN;
+      else
+        motor_bcw_speed+=actuator_speed;
+      if(motor_bccw_speed+actuator_speed< THROTTLE_MIN)
+        motor_bccw_speed=THROTTLE_MIN;
+      else
+        motor_bccw_speed+=actuator_speed;
+      pitch_pid_b=true;
+    }
+    else  //INCREASE THE POWER IN FRONT MOTORS
+    {
+      if(motor_fcw_speed-actuator_speed>=THROTTLE_MAX)
+        motor_fcw_speed=THROTTLE_MAX;
+      else
+        motor_fcw_speed-=actuator_speed;
+      if(motor_fccw_speed-actuator_speed>=THROTTLE_MAX)
+        motor_fccw_speed=THROTTLE_MAX;
+      else
+        motor_fccw_speed-=actuator_speed;
+      pitch_pid_f=true;
+    }
+  }
+  else
   {
     pitch_pid_f=false;
     pitch_pid_b=false;
